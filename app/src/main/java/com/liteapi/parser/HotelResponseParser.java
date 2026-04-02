@@ -8,6 +8,7 @@ import com.liteapi.model.Hotel;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * Parses the JSON response from the LiteAPI hotel-search endpoint into
@@ -17,6 +18,8 @@ import java.util.List;
  * rather than throwing.
  */
 public class HotelResponseParser {
+
+    private static final Logger LOG = Logger.getLogger(HotelResponseParser.class.getName());
 
     private final ObjectMapper objectMapper;
 
@@ -31,15 +34,19 @@ public class HotelResponseParser {
      * @return list of parsed {@link Hotel} objects (never {@code null})
      */
     public List<Hotel> parse(String json) {
+        LOG.fine("Parsing hotel search response (" + (json != null ? json.length() : 0) + " bytes)");
         JsonNode root;
         try {
             root = objectMapper.readTree(json);
         } catch (IOException e) {
+            LOG.severe("Failed to parse hotel search response: " + e.getMessage());
             throw new ApiException("Failed to parse hotel search response: " + e.getMessage(), e);
         }
 
         JsonNode data = root.path("data");
         if (data.isMissingNode() || data.isNull() || !data.isArray()) {
+            LOG.warning("Hotel search response has no 'data' array — response structure may have changed. "
+                    + "Root keys: " + root.fieldNames());
             return List.of();
         }
 
@@ -47,6 +54,7 @@ public class HotelResponseParser {
         for (JsonNode hotelNode : data) {
             hotels.add(parseHotel(hotelNode));
         }
+        LOG.fine("Parsed " + hotels.size() + " hotel(s) from response");
         return hotels;
     }
 
