@@ -58,7 +58,7 @@ public class Main {
             root.setLevel(Level.FINE);
             Arrays.stream(root.getHandlers()).forEach(h -> h.setLevel(Level.FINE));
             Logger.getLogger("com.liteapi").setLevel(Level.FINE);
-            System.out.println("  [DEBUG] Verbose logging enabled.");
+            System.out.println("  \u001B[33m[DEBUG]\u001B[0m Verbose logging enabled.");
         }
 
         String[] effectiveArgs = argList.toArray(new String[0]);
@@ -161,7 +161,9 @@ public class Main {
         }
 
         presenter.printRates(rates);
-        System.out.println("Done.");
+        System.out.println();
+        System.out.println("  \u001B[32m\u001B[1m✔  Done.\u001B[0m");
+        System.out.println();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -222,7 +224,7 @@ public class Main {
             rawInput = String.join(" ", args);
             presenter.printInfo("Using location from command-line argument: " + rawInput);
         } else {
-            System.out.print("  Enter city name or country code (e.g. 'New York, US' or 'US'): ");
+            System.out.print("  \u001B[36m▶\u001B[0m  Enter city name or country code (e.g. 'New York, US' or 'US'): ");
             rawInput = scanner.nextLine().trim();
         }
         return parseLocation(rawInput);
@@ -260,8 +262,8 @@ public class Main {
      */
     private static String resolveHotelId(List<Hotel> hotels, Scanner scanner, Presenter presenter) {
         while (true) {
-            System.out.println("  Enter hotel number (1-" + hotels.size() + ") or paste a Hotel ID:");
-            System.out.print("  > ");
+            System.out.println("  \u001B[36m▶\u001B[0m  Enter hotel number (1-" + hotels.size() + ") or paste a Hotel ID:");
+            System.out.print("  \u001B[1m>\u001B[0m ");
             System.out.flush();
             String input = scanner.nextLine().trim();
 
@@ -283,8 +285,8 @@ public class Main {
     }
 
     private static String promptWithDefault(Scanner scanner, String prompt, String defaultValue) {
-        System.out.println("  " + prompt + " (default " + defaultValue + "):");
-        System.out.print("  > ");
+        System.out.println("  \u001B[36m▶\u001B[0m  " + prompt + " \u001B[2m(default: " + defaultValue + ")\u001B[0m");
+        System.out.print("  \u001B[1m>\u001B[0m ");
         System.out.flush();
         String value = scanner.nextLine().trim();
         return value.isBlank() ? defaultValue : value;
@@ -301,7 +303,7 @@ public class Main {
             } catch (NumberFormatException ignored) {
                 // handled below
             }
-            System.out.println("  Invalid value. Please enter an integer >= 1.");
+            System.out.println("  \u001B[31m✖\u001B[0m  Invalid value. Please enter an integer >= 1.");
         }
     }
 }
