@@ -32,6 +32,7 @@ public class LiteApiClient {
     private static final String API_KEY_HEADER = "X-API-Key";
     private static final int MAX_RETRIES = 3;
     private static final long INITIAL_BACKOFF_MS = 2_000;
+    private static final int MAX_LOG_BODY_LENGTH = 500;
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -208,8 +209,8 @@ public class LiteApiClient {
 
     private String truncateBody(String body) {
         if (body == null) return "(null)";
-        int limit = Math.min(body.length(), 500);
-        return body.substring(0, limit) + (body.length() > 500 ? "... [truncated]" : "");
+        int limit = Math.min(body.length(), MAX_LOG_BODY_LENGTH);
+        return body.substring(0, limit) + (body.length() > MAX_LOG_BODY_LENGTH ? "... [truncated]" : "");
     }
 
     private void sleep(long ms) {
