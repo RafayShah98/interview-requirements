@@ -5,6 +5,7 @@ import com.liteapi.exception.ApiException;
 import com.liteapi.http.LiteApiClient;
 import com.liteapi.model.Hotel;
 import com.liteapi.model.HotelRate;
+import com.liteapi.model.Occupancy;
 import com.liteapi.model.RateRequest;
 import com.liteapi.parser.HotelResponseParser;
 import com.liteapi.parser.RateResponseParser;
@@ -31,8 +32,8 @@ import java.util.Scanner;
 public class Main {
 
     // Default stay dates — edit these or make them interactive as needed
-    private static final String DEFAULT_CHECKIN  = "2025-11-10";
-    private static final String DEFAULT_CHECKOUT = "2025-11-12";
+    private static final String DEFAULT_CHECKIN  = "2026-05-02";
+    private static final String DEFAULT_CHECKOUT = "2026-05-04";
     private static final String DEFAULT_CURRENCY = "USD";
     private static final String DEFAULT_NATIONALITY = "US";
     private static final int    DEFAULT_ADULTS   = 2;
@@ -87,17 +88,33 @@ public class Main {
 
         String hotelId = resolveHotelId(hotels, scanner, presenter);
 
+        System.out.print("  Enter check-in date [YYYY-MM-DD] (default " + DEFAULT_CHECKIN + "): ");
+        String checkin = scanner.nextLine().trim();
+        if (checkin.isBlank()) checkin = DEFAULT_CHECKIN;
+
+        System.out.print("  Enter check-out date [YYYY-MM-DD] (default " + DEFAULT_CHECKOUT + "): ");
+        String checkout = scanner.nextLine().trim();
+        if (checkout.isBlank()) checkout = DEFAULT_CHECKOUT;
+
+        System.out.print("  Enter currency code (default " + DEFAULT_CURRENCY + "): ");
+        String currency = scanner.nextLine().trim();
+        if (currency.isBlank()) currency = DEFAULT_CURRENCY;
+
+        System.out.print("  Enter guest nationality (default " + DEFAULT_NATIONALITY + "): ");
+        String nationality = scanner.nextLine().trim();
+        if (nationality.isBlank()) nationality = DEFAULT_NATIONALITY;
+
         presenter.printInfo(String.format(
                 "Fetching rates for hotel %s  (check-in: %s, check-out: %s) ...",
-                hotelId, DEFAULT_CHECKIN, DEFAULT_CHECKOUT));
+                hotelId, checkin, checkout));
 
         RateRequest rateRequest = new RateRequest(
                 List.of(hotelId),
-                DEFAULT_CHECKIN,
-                DEFAULT_CHECKOUT,
-                DEFAULT_CURRENCY,
-                DEFAULT_NATIONALITY,
-                DEFAULT_ADULTS
+                checkin,
+                checkout,
+                currency,
+                nationality,
+                List.of(new Occupancy(DEFAULT_ADULTS, 0, List.of()))
         );
 
         List<HotelRate> rates;
