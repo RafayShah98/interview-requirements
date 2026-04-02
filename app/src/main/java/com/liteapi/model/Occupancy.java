@@ -8,6 +8,5 @@ import java.util.List;
  */
 public record Occupancy(
         int adults,
-        int children,
-        List<Integer> childAges
+        List<Integer> children
 ) {}

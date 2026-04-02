@@ -146,7 +146,7 @@ public class Main {
                 checkout,
                 currency,
                 nationality,
-                List.of(new Occupancy(DEFAULT_ADULTS, 0, List.of()))
+                List.of(new Occupancy(DEFAULT_ADULTS, List.of()))
         );
 
         List<HotelRate> rates;
