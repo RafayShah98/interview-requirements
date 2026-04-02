@@ -12,6 +12,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Optional;
 
 /**
  * Low-level HTTP layer responsible for all communication with the LiteAPI.
@@ -55,7 +56,7 @@ public class LiteApiClient {
 
         if (cityName != null && !cityName.isBlank()) {
             url.append("&cityName=")
-               .append(URLEncoder.encode(cityName.trim(), StandardCharsets.UTF_8));
+                    .append(URLEncoder.encode(cityName.trim(), StandardCharsets.UTF_8));
         }
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -114,10 +115,11 @@ public class LiteApiClient {
                     throw new ApiException(429,
                             "Rate limit exceeded. Please wait and try again later.");
                 }
+                long delayMs = retryDelayMillis(response).orElse(backoffMs);
                 System.out.printf(
                         "  [Rate limit] Too many requests. Retrying in %d second(s)... (attempt %d/%d)%n",
-                        backoffMs / 1000, attempt, MAX_RETRIES);
-                sleep(backoffMs);
+                        Math.max(1, delayMs / 1000), attempt, MAX_RETRIES);
+                sleep(delayMs);
                 backoffMs *= 2; // exponential back-off
                 continue;
             }
@@ -167,6 +169,23 @@ public class LiteApiClient {
         }
         int limit = Math.min(body.length(), 200);
         return body.substring(0, limit);
+    }
+
+    private Optional<Long> retryDelayMillis(HttpResponse<String> response) {
+        Optional<String> retryAfter = response.headers().firstValue("Retry-After");
+        if (retryAfter.isEmpty()) {
+            return Optional.empty();
+        }
+
+        try {
+            long seconds = Long.parseLong(retryAfter.get().trim());
+            if (seconds > 0) {
+                return Optional.of(seconds * 1000);
+            }
+        } catch (NumberFormatException ignored) {
+            // Ignore non-numeric values and fall back to exponential back-off.
+        }
+        return Optional.empty();
     }
 
     private HttpResponse<String> send(HttpRequest request) {

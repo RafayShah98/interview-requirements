@@ -12,8 +12,8 @@ import java.util.List;
  */
 public class Presenter {
 
-    private static final String DIVIDER = "─".repeat(60);
-    private static final String THIN_DIVIDER = "·".repeat(60);
+    private static final String DIVIDER = "-".repeat(62);
+    private static final String THIN_DIVIDER = "-".repeat(62);
 
     // -----------------------------------------------------------------------
     // Hotels
@@ -109,7 +109,7 @@ public class Presenter {
     public void printBanner(String title) {
         System.out.println();
         System.out.println(DIVIDER);
-        System.out.println("  " + title);
+        System.out.printf("  %s%n", title);
         System.out.println(DIVIDER);
     }
 
@@ -124,7 +124,7 @@ public class Presenter {
         }
         System.out.println("      Cancel  :");
         for (CancellationPolicy p : policies) {
-            System.out.printf("                %s — %s %s (%s)%n",
+            System.out.printf("                %s - %s %s (%s)%n",
                     p.cancelTime(), p.amount(), p.currency(), p.type());
         }
     }
