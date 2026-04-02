@@ -9,5 +9,6 @@ public record Hotel(
         String street,
         String city,
         String country,
+        String address,
         String starRating
 ) {}

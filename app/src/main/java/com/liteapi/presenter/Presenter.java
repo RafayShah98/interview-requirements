@@ -12,8 +12,8 @@ import java.util.List;
  */
 public class Presenter {
 
-    private static final String DIVIDER = "─".repeat(60);
-    private static final String THIN_DIVIDER = "·".repeat(60);
+    private static final String DIVIDER = "-".repeat(60);
+    private static final String THIN_DIVIDER = ".".repeat(60);
 
     // -----------------------------------------------------------------------
     // Hotels
@@ -29,21 +29,19 @@ public class Presenter {
         }
         System.out.println();
         System.out.println(DIVIDER);
-        System.out.printf("  %-5s %-15s %-30s %s%n", "#", "Hotel ID", "Name", "Stars");
+        System.out.printf("  %-4s %-30s %-15s %s%n", "#", "Hotel Name", "Hotel ID", "Stars");
         System.out.println(DIVIDER);
 
         for (int i = 0; i < hotels.size(); i++) {
             Hotel h = hotels.get(i);
-            System.out.printf("  %-5d %-15s %-30s %-5s%n",
+            String displayAddress = !"N/A".equals(h.address()) ? h.address() : buildAddress(h);
+            System.out.printf("  %-4d %-30s %-15s %-5s%n",
                     i + 1,
-                    truncate(h.id(), 14),
                     truncate(h.name(), 29),
+                    truncate(h.id(), 14),
                     h.starRating()
             );
-            String address = buildAddress(h);
-            if (!address.isBlank()) {
-                System.out.printf("  %5s %-15s %s%n", "", "", address);
-            }
+            System.out.printf("          %s%n", displayAddress);
         }
         System.out.println(DIVIDER);
         System.out.printf("  Total: %d hotel(s)%n", hotels.size());
@@ -92,7 +90,7 @@ public class Presenter {
      */
     public void printError(String message) {
         System.out.println();
-        System.out.println("  ✗ Error: " + message);
+        System.out.println("  [ERROR] " + message);
         System.out.println();
     }
 
@@ -100,7 +98,7 @@ public class Presenter {
      * Prints an informational / section heading.
      */
     public void printInfo(String message) {
-        System.out.println("  → " + message);
+        System.out.println("  -> " + message);
     }
 
     /**
@@ -124,7 +122,7 @@ public class Presenter {
         }
         System.out.println("      Cancel  :");
         for (CancellationPolicy p : policies) {
-            System.out.printf("                %s — %s %s (%s)%n",
+            System.out.printf("                %s - %s %s (%s)%n",
                     p.cancelTime(), p.amount(), p.currency(), p.type());
         }
     }
@@ -132,13 +130,19 @@ public class Presenter {
     private String buildAddress(Hotel h) {
         StringBuilder sb = new StringBuilder();
         if (!"N/A".equals(h.street()))  sb.append(h.street());
-        if (!"N/A".equals(h.city()))   { if (!sb.isEmpty()) sb.append(", "); sb.append(h.city()); }
-        if (!"N/A".equals(h.country())) { if (!sb.isEmpty()) sb.append(", "); sb.append(h.country()); }
-        return sb.toString();
+        if (!"N/A".equals(h.city())) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append(h.city());
+        }
+        if (!"N/A".equals(h.country())) {
+            if (!sb.isEmpty()) sb.append(", ");
+            sb.append(h.country());
+        }
+        return sb.isEmpty() ? "N/A" : sb.toString();
     }
 
     private String truncate(String value, int maxLen) {
         if (value == null) return "N/A";
-        return value.length() <= maxLen ? value : value.substring(0, maxLen - 1) + "…";
+        return value.length() <= maxLen ? value : value.substring(0, maxLen - 3) + "...";
     }
 }

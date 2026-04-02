@@ -45,9 +45,16 @@ public class HotelResponseParser {
 
         JsonNode data = root.path("data");
         if (data.isMissingNode() || data.isNull() || !data.isArray()) {
-            LOG.warning("Hotel search response has no 'data' array — response structure may have changed. "
+            LOG.warning("Hotel search response has no 'data' array - response structure may have changed. "
                     + "Root keys: " + root.fieldNames());
             return List.of();
+        }
+
+        // Debug: log first hotel JSON to see structure
+        if (data.size() > 0) {
+            String firstHotelJson = data.get(0).toString().substring(0, Math.min(500, data.get(0).toString().length()));
+            LOG.fine("First hotel JSON (first 500 chars): " + firstHotelJson);
+            LOG.fine("First hotel field names: " + data.get(0).fieldNames().toString());
         }
 
         List<Hotel> hotels = new ArrayList<>();
@@ -63,12 +70,23 @@ public class HotelResponseParser {
         String name        = text(node, "name");
         String starRating  = starRating(node);
 
+        // Extract full address string from top-level "address" field
+        String fullAddress = text(node, "address");
+
         JsonNode address   = node.path("address");
         String street      = addressField(address, "street1", "street");
         String city        = addressField(address, "city", "cityName");
         String country     = addressField(address, "country", "countryCode");
 
-        return new Hotel(id, name, street, city, country, starRating);
+        // Fallback to top-level fields if nested address is missing
+        if ("N/A".equals(city)) {
+            city = text(node, "city");
+        }
+        if ("N/A".equals(country)) {
+            country = text(node, "country");
+        }
+
+        return new Hotel(id, name, street, city, country, fullAddress, starRating);
     }
 
     private String text(JsonNode node, String field) {

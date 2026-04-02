@@ -27,11 +27,7 @@ class HotelResponseParserTest {
                       "id": "lp24373",
                       "name": "Grand Central Hotel",
                       "starRating": "4",
-                      "address": {
-                        "street1": "123 Main St",
-                        "city": "New York",
-                        "country": "US"
-                      }
+                      "address": "123 Main St, New York, US"
                     }
                   ]
                 }
@@ -44,9 +40,10 @@ class HotelResponseParserTest {
         assertEquals("lp24373",           h.id());
         assertEquals("Grand Central Hotel", h.name());
         assertEquals("4",                 h.starRating());
-        assertEquals("123 Main St",       h.street());
-        assertEquals("New York",          h.city());
-        assertEquals("US",                h.country());
+        assertEquals("N/A",               h.street());
+        assertEquals("N/A",               h.city());
+        assertEquals("N/A",               h.country());
+        assertEquals("123 Main St, New York, US", h.address());
     }
 
     @Test
@@ -54,10 +51,8 @@ class HotelResponseParserTest {
         String json = """
                 {
                   "data": [
-                    {"id": "h1", "name": "Hotel A", "starRating": "3",
-                     "address": {"street1": "1 Road", "city": "NYC", "country": "US"}},
-                    {"id": "h2", "name": "Hotel B", "starRating": "5",
-                     "address": {"street1": "2 Ave",  "city": "NYC", "country": "US"}}
+                    {"id": "h1", "name": "Hotel A", "starRating": "3", "address": "1 Road, NYC, US"},
+                    {"id": "h2", "name": "Hotel B", "starRating": "5", "address": "2 Ave, NYC, US"}
                   ]
                 }
                 """;
@@ -66,6 +61,35 @@ class HotelResponseParserTest {
         assertEquals(2, hotels.size());
         assertEquals("h1", hotels.get(0).id());
         assertEquals("h2", hotels.get(1).id());
+        assertEquals("1 Road, NYC, US", hotels.get(0).address());
+        assertEquals("2 Ave, NYC, US", hotels.get(1).address());
+    }
+
+    @Test
+    void parsesHotelWithNestedAddressObject() {
+        String json = """
+                {
+                  "data": [
+                    {
+                      "id": "lp42fec",
+                      "name": "Hotel Jadran",
+                      "starRating": "3",
+                      "address": "Obala dr. Franje Tudmana 52",
+                      "city": "Sibenik",
+                      "country": "HR"
+                    }
+                  ]
+                }
+                """;
+
+        List<Hotel> hotels = parser.parse(json);
+        assertEquals(1, hotels.size());
+        Hotel h = hotels.getFirst();
+        assertEquals("lp42fec", h.id());
+        assertEquals("Hotel Jadran", h.name());
+        assertEquals("Obala dr. Franje Tudmana 52", h.address());
+        assertEquals("Sibenik", h.city());
+        assertEquals("HR", h.country());
     }
 
     // ── Missing / null fields ────────────────────────────────────────────────
@@ -85,6 +109,7 @@ class HotelResponseParserTest {
         assertEquals("N/A", hotels.getFirst().street());
         assertEquals("N/A", hotels.getFirst().city());
         assertEquals("N/A", hotels.getFirst().country());
+        assertEquals("N/A", hotels.getFirst().address());
     }
 
     @Test

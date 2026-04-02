@@ -12,5 +12,5 @@ public record RateRequest(
         String checkout,
         String currency,
         String guestNationality,
-        List<Occupancy> occupancies
+        int adults
 ) {}

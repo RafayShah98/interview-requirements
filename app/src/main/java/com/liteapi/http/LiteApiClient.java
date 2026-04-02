@@ -12,6 +12,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -77,6 +80,23 @@ public class LiteApiClient {
     }
 
     /**
+     * Debug helper: logs a sample hotel record from search response.
+     */
+    static String extractSampleHotel(String json) {
+        try {
+            var om = new ObjectMapper();
+            var root = om.readTree(json);
+            var data = root.path("data");
+            if (data.isArray() && data.size() > 0) {
+                return data.get(0).toPrettyString().substring(0, Math.min(800, data.get(0).toPrettyString().length()));
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+        return "";
+    }
+
+    /**
      * Fetches room rates for the given hotel and stay details.
      *
      * @param rateRequest fully populated request body
@@ -85,7 +105,19 @@ public class LiteApiClient {
     public String getHotelRates(RateRequest rateRequest) {
         String body;
         try {
-            body = objectMapper.writeValueAsString(rateRequest);
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("hotelIds", rateRequest.hotelIds());
+            payload.put("checkin", rateRequest.checkin());
+            payload.put("checkout", rateRequest.checkout());
+            payload.put("currency", rateRequest.currency());
+            payload.put("guestNationality", rateRequest.guestNationality());
+            payload.put("adults", rateRequest.adults());
+            // Keep API compatibility while exposing the simplified top-level adults field.
+            payload.put("occupancies", List.of(Map.of(
+                    "adults", rateRequest.adults(),
+                    "children", List.of()
+            )));
+            body = objectMapper.writeValueAsString(payload);
         } catch (IOException e) {
             throw new ApiException("Failed to serialise rate request: " + e.getMessage(), e);
         }
@@ -113,13 +145,13 @@ public class LiteApiClient {
         long backoffMs = INITIAL_BACKOFF_MS;
 
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            LOG.fine("Attempt " + attempt + "/" + MAX_RETRIES + " — " + request.method() + " " + request.uri());
+            LOG.fine("Attempt " + attempt + "/" + MAX_RETRIES + " - " + request.method() + " " + request.uri());
             HttpResponse<String> response = send(request);
             int status = response.statusCode();
             LOG.fine("HTTP " + status + " received");
 
             if (status == 200 || status == 201) {
-                LOG.info("HTTP " + status + " OK — " + request.method() + " " + request.uri());
+                LOG.info("HTTP " + status + " OK - " + request.method() + " " + request.uri());
                 LOG.fine("Response body (" + response.body().length() + " bytes): "
                         + truncateBody(response.body()));
                 return response.body();
@@ -127,11 +159,11 @@ public class LiteApiClient {
 
             if (status == 429) {
                 if (attempt == MAX_RETRIES) {
-                    LOG.warning("HTTP 429 — rate limit exceeded after " + attempt + " attempt(s)");
+                    LOG.warning("HTTP 429 - rate limit exceeded after " + attempt + " attempt(s)");
                     throw new ApiException(429,
                             "Rate limit exceeded. Please wait and try again later.");
                 }
-                LOG.warning("HTTP 429 — rate limit hit, retrying in " + (backoffMs / 1000)
+                LOG.warning("HTTP 429 - rate limit hit, retrying in " + (backoffMs / 1000)
                         + "s (attempt " + attempt + "/" + MAX_RETRIES + ")");
                 System.out.printf(
                         "  [Rate limit] Too many requests. Retrying in %d second(s)... (attempt %d/%d)%n",
@@ -141,8 +173,8 @@ public class LiteApiClient {
                 continue;
             }
 
-            LOG.warning("HTTP " + status + " error — " + request.method() + " " + request.uri()
-                    + " — body: " + truncateBody(response.body()));
+            LOG.warning("HTTP " + status + " error - " + request.method() + " " + request.uri()
+                    + " - body: " + truncateBody(response.body()));
             handleErrorStatus(status, request.uri().toString(), response.body());
         }
 
@@ -157,16 +189,16 @@ public class LiteApiClient {
         String apiMessage = extractMessage(body);
         switch (status) {
             case 400 -> throw new ApiException(400,
-                    "Bad request — missing or invalid parameters."
+                    "Bad request - missing or invalid parameters."
                     + (apiMessage.isBlank() ? "" : " API says: " + apiMessage));
             case 401 -> throw new ApiException(401,
-                    "Authentication failed — check that your API key is correct.");
+                    "Authentication failed - check that your API key is correct.");
             case 403 -> throw new ApiException(403,
-                    "Access forbidden — your API key does not have permission for this resource.");
+                    "Access forbidden - your API key does not have permission for this resource.");
             case 404 -> throw new ApiException(404,
-                    "Resource not found — the endpoint does not exist: " + url);
+                    "Resource not found - the endpoint does not exist: " + url);
             case 500 -> throw new ApiException(500,
-                    "Server error — LiteAPI is experiencing issues. Please try again later."
+                    "Server error - LiteAPI is experiencing issues. Please try again later."
                     + (apiMessage.isBlank() ? "" : " API says: " + apiMessage));
             default  -> throw new ApiException(status,
                     "Unexpected response from LiteAPI (HTTP " + status + ") for " + url + "."
@@ -188,7 +220,7 @@ public class LiteApiClient {
                 }
             }
         } catch (IOException ignored) {
-            // body is not JSON — return raw (trimmed) text
+            // body is not JSON - return raw (trimmed) text
         }
         int limit = Math.min(body.length(), 200);
         return body.substring(0, limit);

@@ -41,9 +41,17 @@ public class RateResponseParser {
             throw new ApiException("Failed to parse rates response: " + e.getMessage(), e);
         }
 
+        JsonNode error = root.path("error");
+        if (!error.isMissingNode() && !error.isNull() && error.isObject()) {
+            int code = error.path("code").asInt(0);
+            String message = error.path("message").asText("Unknown API error");
+            LOG.warning("Rates API returned an error payload: code=" + code + ", message=" + message);
+            throw new ApiException(code, "Rates API error: " + message);
+        }
+
         JsonNode data = root.path("data");
         if (data.isMissingNode() || data.isNull()) {
-            LOG.warning("Rates response has no 'data' field — response structure may have changed. "
+            LOG.warning("Rates response has no 'data' field - response structure may have changed. "
                     + "Root keys: " + root.fieldNames());
             return List.of();
         }
@@ -66,6 +74,10 @@ public class RateResponseParser {
         List<HotelRate> result = new ArrayList<>();
 
         JsonNode rooms = hotelNode.path("rooms");
+        if (!rooms.isArray()) {
+            // LiteAPI also returns room data under `roomTypes` in some responses.
+            rooms = hotelNode.path("roomTypes");
+        }
         if (rooms.isArray()) {
             for (JsonNode room : rooms) {
                 result.addAll(parseRoom(hotelId, room));
@@ -75,12 +87,21 @@ public class RateResponseParser {
     }
 
     private List<HotelRate> parseRoom(String hotelId, JsonNode room) {
-        String roomName = room.path("name").asText("N/A");
         List<HotelRate> result = new ArrayList<>();
 
         JsonNode rates = room.path("rates");
         if (rates.isArray()) {
             for (JsonNode rateNode : rates) {
+                // Try to get room name from the rate object first (new API format)
+                String roomName = rateNode.path("name").asText(null);
+                // Fall back to room-level name if not found in rate
+                if (roomName == null) {
+                    roomName = room.path("name").asText(null);
+                }
+                // Final fallback to roomType
+                if (roomName == null) {
+                    roomName = room.path("roomType").asText("N/A");
+                }
                 result.add(parseRate(hotelId, roomName, rateNode));
             }
         }

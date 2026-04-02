@@ -5,7 +5,6 @@ import com.liteapi.exception.ApiException;
 import com.liteapi.http.LiteApiClient;
 import com.liteapi.model.Hotel;
 import com.liteapi.model.HotelRate;
-import com.liteapi.model.Occupancy;
 import com.liteapi.model.RateRequest;
 import com.liteapi.parser.HotelResponseParser;
 import com.liteapi.parser.RateResponseParser;
@@ -86,7 +85,7 @@ public class Main {
         Scanner scanner = new Scanner(System.in);
 
         // ── Flow 1 — Search Hotels ────────────────────────────────────────────
-        presenter.printBanner("FLOW 1 — HOTEL SEARCH");
+        presenter.printBanner("FLOW 1 - HOTEL SEARCH");
 
         String[] locationInput = resolveLocation(effectiveArgs, scanner, presenter);
         String countryCode = locationInput[0];
@@ -100,8 +99,12 @@ public class Main {
             LOG.info("Starting hotel search for countryCode=" + countryCode
                     + (cityName.isBlank() ? "" : ", cityName=" + cityName));
             String json = client.searchHotels(countryCode, cityName);
+            // Debug: log first 1000 chars of response
+            if (json.length() > 100) {
+                LOG.fine("Sample response: " + json.substring(0, Math.min(1000, json.length())));
+            }
             hotels = hotelParser.parse(json);
-            LOG.info("Hotel search complete — " + hotels.size() + " hotel(s) found");
+            LOG.info("Hotel search complete - " + hotels.size() + " hotel(s) found");
         } catch (ApiException e) {
             LOG.log(Level.SEVERE, "Hotel search failed", e);
             presenter.printError(formatError(e));
@@ -116,25 +119,19 @@ public class Main {
         }
 
         // ── Flow 2 — Get Hotel Rates ──────────────────────────────────────────
-        presenter.printBanner("FLOW 2 — HOTEL RATES");
+        presenter.printBanner("FLOW 2 - HOTEL RATES");
 
         String hotelId = resolveHotelId(hotels, scanner, presenter);
 
-        System.out.print("  Enter check-in date [YYYY-MM-DD] (default " + DEFAULT_CHECKIN + "): ");
-        String checkin = scanner.nextLine().trim();
-        if (checkin.isBlank()) checkin = DEFAULT_CHECKIN;
-
-        System.out.print("  Enter check-out date [YYYY-MM-DD] (default " + DEFAULT_CHECKOUT + "): ");
-        String checkout = scanner.nextLine().trim();
-        if (checkout.isBlank()) checkout = DEFAULT_CHECKOUT;
-
-        System.out.print("  Enter currency code (default " + DEFAULT_CURRENCY + "): ");
-        String currency = scanner.nextLine().trim();
-        if (currency.isBlank()) currency = DEFAULT_CURRENCY;
-
-        System.out.print("  Enter guest nationality (default " + DEFAULT_NATIONALITY + "): ");
-        String nationality = scanner.nextLine().trim();
-        if (nationality.isBlank()) nationality = DEFAULT_NATIONALITY;
+        String checkin = promptWithDefault(scanner,
+                "Enter check-in date [YYYY-MM-DD]", DEFAULT_CHECKIN);
+        String checkout = promptWithDefault(scanner,
+                "Enter check-out date [YYYY-MM-DD]", DEFAULT_CHECKOUT);
+        String currency = promptWithDefault(scanner,
+                "Enter currency code", DEFAULT_CURRENCY);
+        String nationality = promptWithDefault(scanner,
+                "Enter guest nationality", DEFAULT_NATIONALITY);
+        int adults = promptAdults(scanner, DEFAULT_ADULTS);
 
         presenter.printInfo(String.format(
                 "Fetching rates for hotel %s  (check-in: %s, check-out: %s) ...",
@@ -146,7 +143,7 @@ public class Main {
                 checkout,
                 currency,
                 nationality,
-                List.of(new Occupancy(DEFAULT_ADULTS, List.of()))
+                adults
         );
 
         List<HotelRate> rates;
@@ -155,7 +152,7 @@ public class Main {
                     + ", checkin=" + checkin + ", checkout=" + checkout);
             String json = client.getHotelRates(rateRequest);
             rates = rateParser.parse(json);
-            LOG.info("Rates fetch complete — " + rates.size() + " rate(s) found");
+            LOG.info("Rates fetch complete - " + rates.size() + " rate(s) found");
         } catch (ApiException e) {
             LOG.log(Level.SEVERE, "Rates fetch failed", e);
             presenter.printError(formatError(e));
@@ -263,7 +260,9 @@ public class Main {
      */
     private static String resolveHotelId(List<Hotel> hotels, Scanner scanner, Presenter presenter) {
         while (true) {
-            System.out.print("  Enter hotel number (1-" + hotels.size() + ") or paste a Hotel ID: ");
+            System.out.println("  Enter hotel number (1-" + hotels.size() + ") or paste a Hotel ID:");
+            System.out.print("  > ");
+            System.out.flush();
             String input = scanner.nextLine().trim();
 
             // Try to parse as a list index first
@@ -280,6 +279,29 @@ public class Main {
                 }
                 presenter.printError("Input cannot be empty.");
             }
+        }
+    }
+
+    private static String promptWithDefault(Scanner scanner, String prompt, String defaultValue) {
+        System.out.println("  " + prompt + " (default " + defaultValue + "):");
+        System.out.print("  > ");
+        System.out.flush();
+        String value = scanner.nextLine().trim();
+        return value.isBlank() ? defaultValue : value;
+    }
+
+    private static int promptAdults(Scanner scanner, int defaultValue) {
+        while (true) {
+            String raw = promptWithDefault(scanner, "Enter number of adults", String.valueOf(defaultValue));
+            try {
+                int adults = Integer.parseInt(raw);
+                if (adults >= 1) {
+                    return adults;
+                }
+            } catch (NumberFormatException ignored) {
+                // handled below
+            }
+            System.out.println("  Invalid value. Please enter an integer >= 1.");
         }
     }
 }
