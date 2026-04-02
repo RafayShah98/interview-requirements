@@ -12,6 +12,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Low-level HTTP layer responsible for all communication with the LiteAPI.
@@ -24,10 +26,13 @@ import java.time.Duration;
  */
 public class LiteApiClient {
 
+    private static final Logger LOG = Logger.getLogger(LiteApiClient.class.getName());
+
     private static final String BASE_URL = "https://api.liteapi.travel/v3.0";
     private static final String API_KEY_HEADER = "X-API-Key";
     private static final int MAX_RETRIES = 3;
     private static final long INITIAL_BACKOFF_MS = 2_000;
+    private static final int MAX_LOG_BODY_LENGTH = 500;
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -58,6 +63,8 @@ public class LiteApiClient {
                .append(URLEncoder.encode(cityName.trim(), StandardCharsets.UTF_8));
         }
 
+        LOG.info("GET " + url);
+
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url.toString()))
                 .header(API_KEY_HEADER, apiKey)
@@ -83,8 +90,12 @@ public class LiteApiClient {
             throw new ApiException("Failed to serialise rate request: " + e.getMessage(), e);
         }
 
+        String ratesUrl = BASE_URL + "/hotels/rates";
+        LOG.info("POST " + ratesUrl);
+        LOG.fine("Request body: " + body);
+
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(BASE_URL + "/hotels/rates"))
+                .uri(URI.create(ratesUrl))
                 .header(API_KEY_HEADER, apiKey)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
@@ -102,18 +113,26 @@ public class LiteApiClient {
         long backoffMs = INITIAL_BACKOFF_MS;
 
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            LOG.fine("Attempt " + attempt + "/" + MAX_RETRIES + " — " + request.method() + " " + request.uri());
             HttpResponse<String> response = send(request);
             int status = response.statusCode();
+            LOG.fine("HTTP " + status + " received");
 
             if (status == 200 || status == 201) {
+                LOG.info("HTTP " + status + " OK — " + request.method() + " " + request.uri());
+                LOG.fine("Response body (" + response.body().length() + " bytes): "
+                        + truncateBody(response.body()));
                 return response.body();
             }
 
             if (status == 429) {
                 if (attempt == MAX_RETRIES) {
+                    LOG.warning("HTTP 429 — rate limit exceeded after " + attempt + " attempt(s)");
                     throw new ApiException(429,
                             "Rate limit exceeded. Please wait and try again later.");
                 }
+                LOG.warning("HTTP 429 — rate limit hit, retrying in " + (backoffMs / 1000)
+                        + "s (attempt " + attempt + "/" + MAX_RETRIES + ")");
                 System.out.printf(
                         "  [Rate limit] Too many requests. Retrying in %d second(s)... (attempt %d/%d)%n",
                         backoffMs / 1000, attempt, MAX_RETRIES);
@@ -122,7 +141,9 @@ public class LiteApiClient {
                 continue;
             }
 
-            handleErrorStatus(status, response.body());
+            LOG.warning("HTTP " + status + " error — " + request.method() + " " + request.uri()
+                    + " — body: " + truncateBody(response.body()));
+            handleErrorStatus(status, request.uri().toString(), response.body());
         }
 
         // Unreachable, but satisfies the compiler
@@ -132,20 +153,24 @@ public class LiteApiClient {
     /**
      * Maps HTTP error status codes to meaningful {@link ApiException}s.
      */
-    private void handleErrorStatus(int status, String body) {
+    private void handleErrorStatus(int status, String url, String body) {
+        String apiMessage = extractMessage(body);
         switch (status) {
             case 400 -> throw new ApiException(400,
-                    "Bad request — missing or invalid parameters. " + extractMessage(body));
+                    "Bad request — missing or invalid parameters."
+                    + (apiMessage.isBlank() ? "" : " API says: " + apiMessage));
             case 401 -> throw new ApiException(401,
                     "Authentication failed — check that your API key is correct.");
             case 403 -> throw new ApiException(403,
                     "Access forbidden — your API key does not have permission for this resource.");
             case 404 -> throw new ApiException(404,
-                    "Resource not found — the requested endpoint or resource does not exist.");
+                    "Resource not found — the endpoint does not exist: " + url);
             case 500 -> throw new ApiException(500,
-                    "Server error — LiteAPI is experiencing issues. Please try again later.");
+                    "Server error — LiteAPI is experiencing issues. Please try again later."
+                    + (apiMessage.isBlank() ? "" : " API says: " + apiMessage));
             default  -> throw new ApiException(status,
-                    "Unexpected response from LiteAPI (HTTP " + status + "). " + extractMessage(body));
+                    "Unexpected response from LiteAPI (HTTP " + status + ") for " + url + "."
+                    + (apiMessage.isBlank() ? "" : " API says: " + apiMessage));
         }
     }
 
@@ -173,11 +198,19 @@ public class LiteApiClient {
         try {
             return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (IOException e) {
+            LOG.log(Level.SEVERE, "Network error sending " + request.method() + " " + request.uri(), e);
             throw new ApiException("Network error: " + e.getMessage(), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            LOG.log(Level.SEVERE, "Request interrupted: " + request.method() + " " + request.uri(), e);
             throw new ApiException("Request interrupted.", e);
         }
+    }
+
+    private String truncateBody(String body) {
+        if (body == null) return "(null)";
+        int limit = Math.min(body.length(), MAX_LOG_BODY_LENGTH);
+        return body.substring(0, limit) + (body.length() > MAX_LOG_BODY_LENGTH ? "... [truncated]" : "");
     }
 
     private void sleep(long ms) {

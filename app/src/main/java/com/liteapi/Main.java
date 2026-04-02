@@ -11,8 +11,14 @@ import com.liteapi.parser.HotelResponseParser;
 import com.liteapi.parser.RateResponseParser;
 import com.liteapi.presenter.Presenter;
 
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 /**
  * Entry point for the LiteAPI Hotel Search CLI application.
@@ -31,6 +37,8 @@ import java.util.Scanner;
  */
 public class Main {
 
+    private static final Logger LOG = Logger.getLogger(Main.class.getName());
+
     // Default stay dates — edit these or make them interactive as needed
     private static final String DEFAULT_CHECKIN  = "2026-05-02";
     private static final String DEFAULT_CHECKOUT = "2026-05-04";
@@ -39,14 +47,34 @@ public class Main {
     private static final int    DEFAULT_ADULTS   = 2;
 
     public static void main(String[] args) {
+        // ── Logging setup ─────────────────────────────────────────────────────
+        initLogging();
+
+        // Check for --debug flag and enable verbose logging if present
+        List<String> argList = new ArrayList<>(Arrays.asList(args));
+        boolean debug = argList.remove("--debug")
+                || "true".equalsIgnoreCase(System.getenv("LITEAPI_DEBUG"));
+        if (debug) {
+            Logger root = Logger.getLogger("");
+            root.setLevel(Level.FINE);
+            Arrays.stream(root.getHandlers()).forEach(h -> h.setLevel(Level.FINE));
+            Logger.getLogger("com.liteapi").setLevel(Level.FINE);
+            System.out.println("  [DEBUG] Verbose logging enabled.");
+        }
+
+        String[] effectiveArgs = argList.toArray(new String[0]);
+
         Presenter presenter = new Presenter();
 
         // ── Load configuration ────────────────────────────────────────────────
         AppConfig config;
         try {
+            LOG.info("Loading configuration...");
             config = new AppConfig();
+            LOG.info("Configuration loaded successfully");
         } catch (ApiException e) {
-            presenter.printError(e.getMessage());
+            LOG.log(Level.SEVERE, "Configuration failed", e);
+            presenter.printError(formatError(e));
             System.exit(1);
             return;
         }
@@ -60,7 +88,7 @@ public class Main {
         // ── Flow 1 — Search Hotels ────────────────────────────────────────────
         presenter.printBanner("FLOW 1 — HOTEL SEARCH");
 
-        String[] locationInput = resolveLocation(args, scanner, presenter);
+        String[] locationInput = resolveLocation(effectiveArgs, scanner, presenter);
         String countryCode = locationInput[0];
         String cityName    = locationInput[1];
 
@@ -69,10 +97,14 @@ public class Main {
 
         List<Hotel> hotels;
         try {
+            LOG.info("Starting hotel search for countryCode=" + countryCode
+                    + (cityName.isBlank() ? "" : ", cityName=" + cityName));
             String json = client.searchHotels(countryCode, cityName);
             hotels = hotelParser.parse(json);
+            LOG.info("Hotel search complete — " + hotels.size() + " hotel(s) found");
         } catch (ApiException e) {
-            presenter.printError(e.getMessage());
+            LOG.log(Level.SEVERE, "Hotel search failed", e);
+            presenter.printError(formatError(e));
             System.exit(1);
             return;
         }
@@ -119,16 +151,57 @@ public class Main {
 
         List<HotelRate> rates;
         try {
+            LOG.info("Starting rates fetch for hotelId=" + hotelId
+                    + ", checkin=" + checkin + ", checkout=" + checkout);
             String json = client.getHotelRates(rateRequest);
             rates = rateParser.parse(json);
+            LOG.info("Rates fetch complete — " + rates.size() + " rate(s) found");
         } catch (ApiException e) {
-            presenter.printError(e.getMessage());
+            LOG.log(Level.SEVERE, "Rates fetch failed", e);
+            presenter.printError(formatError(e));
             System.exit(1);
             return;
         }
 
         presenter.printRates(rates);
         System.out.println("Done.");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Logging / error helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Initialises java.util.logging from {@code logging.properties} on the classpath.
+     * Falls back to the JVM default if the file cannot be found.
+     */
+    private static void initLogging() {
+        try (InputStream is = Main.class.getClassLoader()
+                .getResourceAsStream("logging.properties")) {
+            if (is != null) {
+                LogManager.getLogManager().readConfiguration(is);
+            }
+        } catch (Exception e) {
+            // If logging configuration fails, continue with JVM defaults
+            System.err.println("[WARN] Could not load logging.properties: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Formats an {@link ApiException} into a clear, descriptive error string that
+     * includes the HTTP status code (when present) and the root-cause message.
+     */
+    private static String formatError(ApiException e) {
+        StringBuilder sb = new StringBuilder();
+        if (e.getStatusCode() > 0) {
+            sb.append("[HTTP ").append(e.getStatusCode()).append("] ");
+        }
+        sb.append(e.getMessage());
+        Throwable cause = e.getCause();
+        if (cause != null && cause.getMessage() != null && !cause.getMessage().equals(e.getMessage())) {
+            sb.append("\n  Caused by: ").append(cause.getMessage());
+        }
+        return sb.toString();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

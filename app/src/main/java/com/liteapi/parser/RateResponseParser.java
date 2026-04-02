@@ -9,12 +9,15 @@ import com.liteapi.model.HotelRate;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * Parses the JSON response from the LiteAPI {@code POST /hotels/rates} endpoint
  * into a flat list of {@link HotelRate} objects, one per room × rate combination.
  */
 public class RateResponseParser {
+
+    private static final Logger LOG = Logger.getLogger(RateResponseParser.class.getName());
 
     private final ObjectMapper objectMapper;
 
@@ -29,15 +32,19 @@ public class RateResponseParser {
      * @return flat list of {@link HotelRate} objects (never {@code null})
      */
     public List<HotelRate> parse(String json) {
+        LOG.fine("Parsing rates response (" + (json != null ? json.length() : 0) + " bytes)");
         JsonNode root;
         try {
             root = objectMapper.readTree(json);
         } catch (IOException e) {
+            LOG.severe("Failed to parse rates response: " + e.getMessage());
             throw new ApiException("Failed to parse rates response: " + e.getMessage(), e);
         }
 
         JsonNode data = root.path("data");
         if (data.isMissingNode() || data.isNull()) {
+            LOG.warning("Rates response has no 'data' field — response structure may have changed. "
+                    + "Root keys: " + root.fieldNames());
             return List.of();
         }
 
@@ -50,6 +57,7 @@ public class RateResponseParser {
         } else {
             rates.addAll(parseHotelNode(data));
         }
+        LOG.fine("Parsed " + rates.size() + " rate(s) from response");
         return rates;
     }
 
