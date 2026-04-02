@@ -1,5 +1,6 @@
 package com.liteapi.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
@@ -8,9 +9,22 @@ import java.util.List;
  */
 public record RateRequest(
         List<String> hotelIds,
+
+        @JsonProperty("checkIn")
         String checkin,
+
+        @JsonProperty("checkOut")
         String checkout,
+
         String currency,
+
+        @JsonProperty("nationality")
         String guestNationality,
-        int adults
-) {}
+
+        List<Occupancy> occupancies
+) {
+    /**
+     * Represents room occupancy details for a rate request.
+     */
+    public record Occupancy(int adults) {}
+}

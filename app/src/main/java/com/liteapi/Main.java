@@ -194,7 +194,14 @@ public class Main {
         );
         int adults = resolveAdults(scanner, presenter);
 
-        return new RateRequest(List.of(hotelId), checkin, checkout, currency, nationality, adults);
+        return new RateRequest(
+                List.of(hotelId),
+                checkin,
+                checkout,
+                currency,
+                nationality,
+                List.of(new RateRequest.Occupancy(adults))
+        );
     }
 
     private static String resolveDate(Scanner scanner, Presenter presenter, String prompt, LocalDate defaultDate) {
